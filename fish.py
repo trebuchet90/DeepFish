@@ -1,4 +1,4 @@
-__author__ = 'ZFTurbo: https://kaggle.com/zfturbo'
+___author__ = 'ZFTurbo: https://kaggle.com/zfturbo'
 
 import numpy as np
 np.random.seed(2016)
@@ -19,6 +19,7 @@ from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2
 from keras.optimizers import SGD
 from keras.callbacks import EarlyStopping
 from keras.utils import np_utils
+from keras.preprocessing.image import ImageDataGenerator
 from sklearn.metrics import log_loss
 from keras import __version__ as keras_version
 
@@ -58,7 +59,6 @@ def load_train():
 def load_test():
     path = os.path.join('test_stg1', '*.jpg')
     files = sorted(glob.glob(path))
-
     X_test = []
     X_test_id = []
     for fl in files:
@@ -166,7 +166,7 @@ def get_validation_predictions(train_data, predictions_valid):
 def run_cross_validation_create_models(nfolds=10):
     # input image dimensions
     batch_size = 16
-    nb_epoch = 50
+    nb_epoch = 40
     random_state = 51
 
     train_data, train_target, train_id = read_and_normalize_train_data()
@@ -191,8 +191,29 @@ def run_cross_validation_create_models(nfolds=10):
         callbacks = [
             EarlyStopping(monitor='val_loss', patience=10, verbose=0),
         ]
-        model.fit(X_train, Y_train, batch_size=batch_size, nb_epoch=nb_epoch,
-              shuffle=True, verbose=2, validation_data=(X_valid, Y_valid),
+
+        datagen = ImageDataGenerator(
+        #featurewise_center=False,  # set input mean to 0 over the dataset
+        #samplewise_center=False,  # set each sample mean to 0
+        #featurewise_std_normalization=False,  # divide inputs by std of the dataset
+        #samplewise_std_normalization=False,  # divide each input by its std
+        #zca_whitening=False,  # apply ZCA whitening
+        #rotation_range=5,  # randomly rotate images in the range (degrees, 0 to 180)
+        #width_shift_range=0.1,  # randomly shift images horizontally (fraction of total width)
+        #height_shift_range=0.1,  # randomly shift images vertically (fraction of total height)
+        horizontal_flip=False,  # randomly flip images
+        vertical_flip=False)  # randomly flip images
+
+        datagen.fit(X_train)
+
+        
+
+        model.fit_generator(
+              datagen.flow(X_train, Y_train, batch_size=batch_size, shuffle=True), 
+              nb_epoch=nb_epoch,
+              verbose=2, 
+              samples_per_epoch=X_train.shape[0]*1,
+              validation_data=(X_valid, Y_valid),
               callbacks=callbacks)
 
         predictions_valid = model.predict(X_valid.astype('float32'), batch_size=batch_size, verbose=2)
@@ -203,8 +224,8 @@ def run_cross_validation_create_models(nfolds=10):
         # Store valid predictions
         for i in range(len(test_index)):
             yfull_train[test_index[i]] = predictions_valid[i]
-
-        models.append(model)
+        if score < 0.9:
+          models.append(model)
 
     score = sum_score/len(train_data)
     print("Log_loss train independent avg: ", score)
@@ -219,7 +240,7 @@ def run_cross_validation_process_test(info_string, models):
     yfull_test = []
     test_id = []
     nfolds = len(models)
-
+    print nfolds
     for i in range(nfolds):
         model = models[i]
         num_fold += 1
