@@ -1,4 +1,4 @@
-___author__ = 'ZFTurbo: https://kaggle.com/zfturbo'
+___author__ = 'ZFTurbo: https://kaggle.com/zfturbo Changes by Bryce Schumacher'
 
 import numpy as np
 np.random.seed(2016)
@@ -17,13 +17,13 @@ from keras.models import Sequential
 from keras.layers.core import Dense, Dropout, Flatten
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D
 from keras.optimizers import SGD
-from keras.callbacks import EarlyStopping
+from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.utils import np_utils
 from keras.preprocessing.image import ImageDataGenerator
 from sklearn.metrics import log_loss
 from keras import __version__ as keras_version
 
-imSize = 64
+imSize = 32
 
 def get_im_cv2(path):
     img = cv2.imread(path)
@@ -132,26 +132,27 @@ def merge_several_folds_mean(data, nfolds):
 def create_model():
     model = Sequential()
     model.add(ZeroPadding2D((1, 1), input_shape=(3, imSize, imSize), dim_ordering='th'))
-    model.add(Convolution2D(8, 3, 3, activation='relu', dim_ordering='th'))
+    model.add(Convolution2D(16, 3, 3, activation='relu', dim_ordering='th'))
     model.add(ZeroPadding2D((1, 1), dim_ordering='th'))
-    model.add(Convolution2D(8, 3, 3, activation='relu', dim_ordering='th'))
+    model.add(Convolution2D(16, 3, 3, activation='relu', dim_ordering='th'))
     model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), dim_ordering='th'))
 
     model.add(ZeroPadding2D((1, 1), dim_ordering='th'))
-    model.add(Convolution2D(16, 3, 3, activation='relu', dim_ordering='th'))
+    model.add(Convolution2D(32, 3, 3, activation='relu', dim_ordering='th'))
     model.add(ZeroPadding2D((1, 1), dim_ordering='th'))
-    model.add(Convolution2D(16, 3, 3, activation='relu', dim_ordering='th'))
+    model.add(Convolution2D(32, 3, 3, activation='relu', dim_ordering='th'))
     model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), dim_ordering='th'))
 
     model.add(Flatten())
     model.add(Dense(32, activation='relu'))
-    model.add(Dropout(0.5))
+#    model.add(Dropout(0.5))
     model.add(Dense(32, activation='relu'))
-    model.add(Dropout(0.5))
+    model.add(Dropout(0.2))
     model.add(Dense(8, activation='softmax'))
 
     sgd = SGD(lr=1e-2, decay=1e-6, momentum=0.9, nesterov=True)
-    model.compile(optimizer=sgd, loss='categorical_crossentropy')
+#    model.compile(optimizer=sgd, loss='categorical_crossentropy')
+    model.compile(optimizer=sgd, loss='categorical_crossentropy', metrics=['categorical_accuracy'])
 
     return model
 
@@ -166,7 +167,7 @@ def get_validation_predictions(train_data, predictions_valid):
 def run_cross_validation_create_models(nfolds=10):
     # input image dimensions
     batch_size = 16
-    nb_epoch = 40
+    nb_epoch = 30
     random_state = 51
 
     train_data, train_target, train_id = read_and_normalize_train_data()
@@ -188,8 +189,11 @@ def run_cross_validation_create_models(nfolds=10):
         print('Split train: ', len(X_train), len(Y_train))
         print('Split valid: ', len(X_valid), len(Y_valid))
 
+        filepath="weights.best."+ str(num_fold) + ".hdf5"
+        checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='auto')
+
         callbacks = [
-            EarlyStopping(monitor='val_loss', patience=10, verbose=0),
+            EarlyStopping(monitor='val_loss', patience=10, verbose=0),checkpoint
         ]
 
         datagen = ImageDataGenerator(
@@ -218,6 +222,32 @@ def run_cross_validation_create_models(nfolds=10):
 
         predictions_valid = model.predict(X_valid.astype('float32'), batch_size=batch_size, verbose=2)
         score = log_loss(Y_valid, predictions_valid)
+        sample = np.random.choice(range(len(Y_valid)),100)
+#        print sample
+        print "sample 1"
+        print log_loss(Y_valid[sample], predictions_valid[sample])
+        print log_loss(Y_valid[sample], np.power(predictions_valid[sample],0.9))
+        print log_loss(Y_valid[sample], np.power(predictions_valid[sample],0.8))
+        print log_loss(Y_valid[sample], np.power(predictions_valid[sample],0.7))
+        print log_loss(Y_valid[sample], np.power(predictions_valid[sample],0.6))
+        print log_loss(Y_valid[sample], np.power(predictions_valid[sample],0.5))
+        print log_loss(Y_valid[sample], np.power(predictions_valid[sample],0.4))
+        print log_loss(Y_valid[sample], np.power(predictions_valid[sample],0.3))
+        print log_loss(Y_valid[sample], np.power(predictions_valid[sample],0.2))
+
+        sample = np.random.choice(range(len(Y_valid)),100)
+        print "sample 2"
+        print log_loss(Y_valid[sample], predictions_valid[sample])
+        print log_loss(Y_valid[sample], np.power(predictions_valid[sample],0.9))
+        print log_loss(Y_valid[sample], np.power(predictions_valid[sample],0.8))
+        print log_loss(Y_valid[sample], np.power(predictions_valid[sample],0.7))
+        print log_loss(Y_valid[sample], np.power(predictions_valid[sample],0.6))
+        print log_loss(Y_valid[sample], np.power(predictions_valid[sample],0.5))
+        print log_loss(Y_valid[sample], np.power(predictions_valid[sample],0.4))
+        print log_loss(Y_valid[sample], np.power(predictions_valid[sample],0.3))
+        print log_loss(Y_valid[sample], np.power(predictions_valid[sample],0.2))
+
+
         print('Score log_loss: ', score)
         sum_score += score*len(test_index)
 
@@ -253,7 +283,12 @@ def run_cross_validation_process_test(info_string, models):
     info_string = 'loss_' + info_string \
                 + '_folds_' + str(nfolds)
     create_submission(test_res, test_id, info_string)
-
+    create_submission(np.power(np.clip(test_res,0,1),0.9), test_id, info_string+'9')
+    create_submission(np.power(np.clip(test_res,0,1),0.8), test_id, info_string+'8')
+    create_submission(np.power(np.clip(test_res,0,1),0.7), test_id, info_string+'7')
+    create_submission(np.power(np.clip(test_res,0,1),0.6), test_id, info_string+'6')
+    create_submission(np.power(np.clip(test_res,0,1),0.5), test_id, info_string+'5')
+    create_submission(np.power(np.clip(test_res,0,1),0.4), test_id, info_string+'4')
 
 if __name__ == '__main__':
     print('Keras version: {}'.format(keras_version))
